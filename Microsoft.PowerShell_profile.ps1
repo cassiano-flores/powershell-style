@@ -37,16 +37,16 @@ function prompt {
     }
 
     # === monta o prompt superior ===
-    Write-HostColor     -Text "`n$UserName@$ComputerName " -HexColor "#13A10E" -NoNewline
-    Write-HostColor     -Text "$CmdPromptCurrentFolder "   -HexColor "#C19C00" -NoNewline
+    Write-HostColor     -Text "`n$UserName@$ComputerName " -HexColor "#13A10E"
+    Write-HostColor     -Text "$CmdPromptCurrentFolder "   -HexColor "#C19C00"
     if ($gitRemoteName -ne '' -and $gitBranch -ne '') {
-        Write-HostColor -Text "("                          -HexColor "#FFFFFF" -NoNewline
-        Write-HostColor -Text "$gitRemoteName"             -HexColor "#D10B0E" -NoNewline
-        Write-HostColor -Text "/"                          -HexColor "#FFFFFF" -NoNewline
-        Write-HostColor -Text "$gitBranch"                 -HexColor "#3A96DD" -NoNewline
-        Write-HostColor -Text ")"                          -HexColor "#FFFFFF" -NoNewline
+        Write-HostColor -Text "("                          -HexColor "#FFFFFF"
+        Write-HostColor -Text "$gitRemoteName"             -HexColor "#D10B0E"
+        Write-HostColor -Text "/"                          -HexColor "#FFFFFF"
+        Write-HostColor -Text "$gitBranch"                 -HexColor "#3A96DD"
+        Write-HostColor -Text ")"                          -HexColor "#FFFFFF"
     }
-    Write-HostColor     -Text "$spaces$DateTime"           -HexColor "#FFFFFF"
+    Write-HostColor     -Text "$spaces$DateTime"           -HexColor "#FFFFFF" -NewLine $false
 
     # === monta o prompt inferior ===
     return "> "
@@ -56,7 +56,7 @@ function Write-HostColor {
     param (
         [string]$Text,
         [string]$HexColor,
-        [switch]$NoNewline
+        [bool]$NewLine = $true
     )
 
     # converte o hexadecimal para RGB
@@ -68,8 +68,8 @@ function Write-HostColor {
     $ansiColor = "`e[38;2;${r};${g};${b}m"
     $resetColor = "`e[0m"
 
-    # escreve o texto com a cor e verifica NoNewline
-    if ($NoNewline) {
+    # escreve o texto com a cor e quebra de linha
+    if ($NewLine) {
         Write-Host -NoNewline "$ansiColor$Text$resetColor"
     } else {
         Write-Host "$ansiColor$Text$resetColor"
