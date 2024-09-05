@@ -38,10 +38,16 @@ function prompt {
   $promptText = "$UserName@$ComputerName $CmdPromptCurrentFolder"
 
   # se tiver em alguma estado eh de um jeito, se nao eh de outro
-  if ($gitState -ne '' -and $gitBranch -ne '') {
-    $promptText += " ($gitBranch|$gitState)"
-  } elseif ($gitRemoteName -ne '' -and $gitBranch -ne '') {
-    $promptText += " ($gitRemoteName/$gitBranch)"
+  if ($isGitRepo) {
+
+    if ($gitState -ne '' -and $gitBranch -ne '') {
+      $promptText += " ($gitBranch|$gitState)"
+    } elseif ($gitRemoteName -ne '' -and $gitBranch -ne '') {
+      $promptText += " ($gitRemoteName/$gitBranch)"
+    }
+
+  } else {
+    $promptText += " "
   }
 
   # espaço para alinhar a hora na direita
