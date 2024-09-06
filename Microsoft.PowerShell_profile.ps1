@@ -1,4 +1,11 @@
-function prompt {
+#******************************************************************************
+# Import all modules and configs for PowerShell
+#******************************************************************************
+. "C:\Users\cmichel\Documents\PowerShell\find-line-endings.ps1"
+
+#******************************************************************************
+
+function Prompt {
 
   # define o titulo da janela
   $CmdPromptUser = [Security.Principal.WindowsIdentity]::GetCurrent();
