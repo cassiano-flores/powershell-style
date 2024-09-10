@@ -1,7 +1,8 @@
 #******************************************************************************
 # Import all modules and configs for PowerShell
 #******************************************************************************
-. "C:\Users\cmichel\Documents\PowerShell\find-line-endings.ps1"
+$profileDir = Split-Path -Parent $PROFILE
+. "$profileDir\find-line-endings.ps1"
 
 #******************************************************************************
 
