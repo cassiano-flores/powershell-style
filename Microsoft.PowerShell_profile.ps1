@@ -18,41 +18,32 @@ function Prompt {
   $ComputerName = $env:COMPUTERNAME
 
   # git
-  $isGitRepo = (Test-Path .git)
-  $gitBranch = ''
-  $gitRemoteName = ''
-  $gitState = ''
-
-  if ($isGitRepo) {
-    $gitBranch = (git branch --show-current)  # branch atual
-    $gitRemoteName = git config --get branch.$gitBranch.remote  # nome do remoto da branch atual
-
-    # estados especiais
-    if (Test-Path .git\REBASE_HEAD) {
-      $gitState = 'REBASING'
-    } elseif (Test-Path .git\MERGE_HEAD) {
-      $gitState = 'MERGING'
-    } elseif (Test-Path .git\CHERRY_PICK_HEAD) {
-      $gitState = 'CHERRY-PICKING'
-    } elseif (Test-Path .git\REVERT_HEAD) {
-      $gitState = 'REVERTING'
-    }
-  }
+  $isGitRepo   = (Test-Path .git)
+  $isREBASING  = (Test-Path .git\REBASE_HEAD)
+  $isMERGING   = (Test-Path .git\MERGE_HEAD)
+  $isCHERRY    = (Test-Path .git\CHERRY_PICK_HEAD)
+  $isREVERTING = (Test-Path .git\REVERT_HEAD)
+  $gitBranch   = ""
+  $gitRemote   = ""
+  $gitState    = ""
 
   # diretorio e data/hora
   $CmdPromptCurrentFolder = $pwd.Path
-  $DateTime = Get-Date -Format 'HH:mm:ss'
+  $DateTime = Get-Date -Format "HH:mm:ss"
 
   # monta a linha
   $promptText = "$UserName@$ComputerName $CmdPromptCurrentFolder"
 
-  # se tiver em alguma estado eh de um jeito, se nao eh de outro
   if ($isGitRepo) {
-
-    if ($gitState -ne '' -and $gitBranch -ne '') {
+    $gitBranch = Get-Branch
+    $gitRemote = git config --get branch.$gitBranch.remote  # nome do remoto da branch atual
+    $gitState  = Get-State
+  
+    # se tiver em alguma estado eh de um jeito, se nao eh de outro
+    if ($gitState -ne "" -and $gitBranch -ne "") {
       $promptText += " ($gitBranch|$gitState)"
-    } elseif ($gitRemoteName -ne '' -and $gitBranch -ne '') {
-      $promptText += " ($gitRemoteName/$gitBranch)"
+    } elseif ($gitRemote -ne "" -and $gitBranch -ne "") {
+      $promptText += " ($gitRemote/$gitBranch)"
     }
 
   } else {
@@ -75,14 +66,14 @@ function Prompt {
   if ($isGitRepo) {
     Write-HostColor   -Text "("                          -HexColor "#FFFFFF"
 
-    if ($gitState -ne '') {
-      Write-HostColor -Text "$gitBranch"                 -HexColor "#3A96DD"
-      Write-HostColor -Text "|"                          -HexColor "#FFFFFF"
-      Write-HostColor -Text "$gitBranch"                 -HexColor "#D10B0E"
-    } else {
-      Write-HostColor -Text "$gitRemoteName"             -HexColor "#D10B0E"
+    if ($gitState -eq "") {
+      Write-HostColor -Text "$gitRemote"                 -HexColor "#D10B0E"
       Write-HostColor -Text "/"                          -HexColor "#FFFFFF"
       Write-HostColor -Text "$gitBranch"                 -HexColor "#3A96DD"
+    } else {
+      Write-HostColor -Text "$gitBranch"                 -HexColor "#3A96DD"
+      Write-HostColor -Text "|"                          -HexColor "#FFFFFF"
+      Write-HostColor -Text "$gitState"                  -HexColor "#D10B0E"
     }
     Write-HostColor   -Text ")"                          -HexColor "#FFFFFF"
   }
@@ -114,4 +105,46 @@ function Write-HostColor {
   } else {
     Write-Host "$ansiColor$Text$resetColor"
   }
+}
+
+# retorna branch atual
+function Get-Branch {
+  $branch = (git branch --show-current)
+
+  if ($branch -eq $null) {
+    if ($isREBASING) {
+      $branch = (Get-Content .git\rebase-merge\head-name)
+      $branch = $branch.split("/")[-1]
+    } elseif ($isMERGING) {
+      $branch = (Get-Content .git\MERGE_HEAD)
+      $branch = $branch.split("/")[-1]
+    } elseif ($isCHERRY) {
+      $branch = (Get-Content .git\CHERRY_PICK_HEAD)
+      $branch = $branch.split("/")[-1]
+    } elseif ($isREVERTING) {
+      $branch = (Get-Content .git\REVERT_HEAD)
+      $branch = $branch.split("/")[-1]
+    } else {
+      $branch = ""
+    }
+  }
+
+  return $branch
+}
+
+# estados especiais do git
+function Get-State {
+  $state = ""
+
+  if ($isREBASING) {
+    $state = "REBASING"
+  } elseif ($isMERGING) {
+    $state = "MERGING"
+  } elseif ($isCHERRY) {
+    $state = "CHERRY-PICKING"
+  } elseif ($isREVERTING) {
+    $state = "REVERTING"
+  }
+
+  return $state
 }
