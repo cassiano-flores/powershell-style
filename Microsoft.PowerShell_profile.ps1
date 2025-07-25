@@ -4,6 +4,7 @@
 $profileDir = Split-Path -Parent $PROFILE
 . "$profileDir\find-line-endings.ps1"
 . "$profileDir\open-path.ps1"
+. "$profileDir\optimize-rad.ps1"
 
 #******************************************************************************
 
