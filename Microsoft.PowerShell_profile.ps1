@@ -1,151 +1,179 @@
 #******************************************************************************
 # Import all modules and configs for PowerShell
 #******************************************************************************
+
 $profileDir = Split-Path -Parent $PROFILE
+
 . "$profileDir\find-line-endings.ps1"
 . "$profileDir\open-path.ps1"
 . "$profileDir\optimize-rad.ps1"
 
 #******************************************************************************
+# ANSI Escape (compatível com PowerShell 5.1 e 7)
+#******************************************************************************
+
+$Esc = [char]27
+
+#******************************************************************************
+# Escreve texto colorido usando ANSI TrueColor
+#******************************************************************************
+
+function Write-HostColor {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Text,
+
+        [Parameter(Mandatory)]
+        [string]$HexColor,
+
+        [switch]$NoNewline
+    )
+
+    $r = [Convert]::ToInt32($HexColor.Substring(1,2),16)
+    $g = [Convert]::ToInt32($HexColor.Substring(3,2),16)
+    $b = [Convert]::ToInt32($HexColor.Substring(5,2),16)
+
+    $ansi  = "${Esc}[38;2;${r};${g};${b}m"
+    $reset = "${Esc}[0m"
+
+    Write-Host "${ansi}${Text}${reset}" -NoNewline:$NoNewline
+}
+
+#******************************************************************************
+# Git
+#******************************************************************************
+
+function Get-Branch {
+
+    $branch = git branch --show-current 2>$null
+
+    if (![string]::IsNullOrWhiteSpace($branch)) {
+        return $branch.Trim()
+    }
+
+    if (Test-Path ".git\rebase-merge\head-name") {
+        return (Get-Content ".git\rebase-merge\head-name").Split("/")[-1]
+    }
+
+    return ""
+}
+
+function Get-State {
+
+    if (Test-Path ".git\REBASE_HEAD") {
+        return "REBASING"
+    }
+
+    if (Test-Path ".git\MERGE_HEAD") {
+        return "MERGING"
+    }
+
+    if (Test-Path ".git\CHERRY_PICK_HEAD") {
+        return "CHERRY-PICKING"
+    }
+
+    if (Test-Path ".git\REVERT_HEAD") {
+        return "REVERTING"
+    }
+
+    return ""
+}
+
+#******************************************************************************
+# Prompt
+#******************************************************************************
 
 function Prompt {
 
-  # define o titulo da janela
-  $CmdPromptUser = [Security.Principal.WindowsIdentity]::GetCurrent();
-  # $host.ui.RawUI.WindowTitle = "PowerShell @ $($CmdPromptUser.Name.split("\")[1])"
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 
-  # nome do usuario e computador
-  $UserName = $CmdPromptUser.Name.split("\")[1]
-  $ComputerName = $env:COMPUTERNAME
+    $UserName     = $identity.Name.Split("\")[1]
+    $ComputerName = $env:COMPUTERNAME
+    $CurrentPath  = $pwd.Path
+    $DateTime     = Get-Date -Format "HH:mm:ss"
 
-  # git
-  $isGitRepo   = (Test-Path .git)
-  $isREBASING  = (Test-Path .git\REBASE_HEAD)
-  $isMERGING   = (Test-Path .git\MERGE_HEAD)
-  $isCHERRY    = (Test-Path .git\CHERRY_PICK_HEAD)
-  $isREVERTING = (Test-Path .git\REVERT_HEAD)
-  $gitBranch   = ""
-  $gitRemote   = ""
-  $gitState    = ""
+    # $Host.UI.RawUI.WindowTitle = "PowerShell @ $UserName"
 
-  # diretorio e data/hora
-  $CmdPromptCurrentFolder = $pwd.Path
-  $DateTime = Get-Date -Format "HH:mm:ss"
+    $isGitRepo = $false
 
-  # monta a linha
-  $promptText = "$UserName@$ComputerName $CmdPromptCurrentFolder"
-
-  if ($isGitRepo) {
-    $gitBranch = Get-Branch
-    $gitRemote = git config --get branch.$gitBranch.remote  # nome do remoto da branch atual
-    $gitState  = Get-State
-  
-    # se tiver em alguma estado eh de um jeito, se nao eh de outro
-    if ($gitState -ne "" -and $gitBranch -ne "") {
-      $promptText += " ($gitBranch|$gitState)"
-    } elseif ($gitRemote -ne "" -and $gitBranch -ne "") {
-      $promptText += " ($gitRemote/$gitBranch)"
+    git rev-parse --is-inside-work-tree *> $null
+    if ($LASTEXITCODE -eq 0) {
+        $isGitRepo = $true
     }
 
-  } else {
-    $promptText += " "
-  }
+    $gitBranch = ""
+    $gitRemote = ""
+    $gitState  = ""
 
-  # espaço para alinhar a hora na direita
-  $consoleWidth = $host.UI.RawUI.WindowSize.Width
-  $textLength = $promptText.Length + $DateTime.Length
+    if ($isGitRepo) {
+        $gitBranch = Get-Branch
+        $gitState  = Get-State
 
-  if ($textLength -lt $consoleWidth) {
-    $spaces = " " * ($consoleWidth - $textLength - 1)
-  } else {
-    $spaces = " "
-  }
-
-  # === monta o prompt superior ===
-  Write-HostColor     -Text "`n$UserName@$ComputerName " -HexColor "#13A10E"
-  Write-HostColor     -Text "$CmdPromptCurrentFolder "   -HexColor "#C19C00"
-  if ($isGitRepo) {
-    Write-HostColor   -Text "("                          -HexColor "#FFFFFF"
-
-    if ($gitState -eq "") {
-      Write-HostColor -Text "$gitRemote"                 -HexColor "#D10B0E"
-      Write-HostColor -Text "/"                          -HexColor "#FFFFFF"
-      Write-HostColor -Text "$gitBranch"                 -HexColor "#3A96DD"
-    } else {
-      Write-HostColor -Text "$gitBranch"                 -HexColor "#3A96DD"
-      Write-HostColor -Text "|"                          -HexColor "#FFFFFF"
-      Write-HostColor -Text "$gitState"                  -HexColor "#D10B0E"
+        if ($gitBranch) {
+            $gitRemote = git config --get branch.$gitBranch.remote 2>$null
+        }
     }
-    Write-HostColor   -Text ")"                          -HexColor "#FFFFFF"
-  }
-  Write-HostColor     -Text "$spaces$DateTime"           -HexColor "#FFFFFF" -NewLine $false
 
-  # === monta o prompt inferior ===
-  return "> "
-}
+    #----------------------------------------------------------------------
+    # Calcula exatamente o texto que será exibido
+    #----------------------------------------------------------------------
 
-function Write-HostColor {
-  param (
-    [string]$Text,
-    [string]$HexColor,
-    [bool]$NewLine = $true
-  )
+    $leftText = "$UserName@$ComputerName $CurrentPath "
 
-  # converte o hexadecimal para RGB
-  $r = [Convert]::ToInt32($HexColor.Substring(1, 2), 16)
-  $g = [Convert]::ToInt32($HexColor.Substring(3, 2), 16)
-  $b = [Convert]::ToInt32($HexColor.Substring(5, 2), 16)
+    if ($isGitRepo) {
 
-  # define a cor usando ANSI escape codes
-  $ansiColor = "`e[38;2;${r};${g};${b}m"
-  $resetColor = "`e[0m"
-
-  # escreve o texto com a cor e quebra de linha
-  if ($NewLine) {
-    Write-Host -NoNewline "$ansiColor$Text$resetColor"
-  } else {
-    Write-Host "$ansiColor$Text$resetColor"
-  }
-}
-
-# retorna branch atual
-function Get-Branch {
-  $branch = (git branch --show-current)
-
-  if ($branch -eq $null) {
-    if ($isREBASING) {
-      $branch = (Get-Content .git\rebase-merge\head-name)
-      $branch = $branch.split("/")[-1]
-    } elseif ($isMERGING) {
-      $branch = (Get-Content .git\MERGE_HEAD)
-      $branch = $branch.split("/")[-1]
-    } elseif ($isCHERRY) {
-      $branch = (Get-Content .git\CHERRY_PICK_HEAD)
-      $branch = $branch.split("/")[-1]
-    } elseif ($isREVERTING) {
-      $branch = (Get-Content .git\REVERT_HEAD)
-      $branch = $branch.split("/")[-1]
-    } else {
-      $branch = ""
+        if ($gitState) {
+            $leftText += "($gitBranch|$gitState)"
+        }
+        elseif ($gitRemote -and $gitBranch) {
+            $leftText += "($gitRemote/$gitBranch)"
+        }
     }
-  }
 
-  return $branch
-}
+    $consoleWidth = $Host.UI.RawUI.WindowSize.Width
 
-# estados especiais do git
-function Get-State {
-  $state = ""
+    # -1 evita que o último caractere da hora pule para a linha seguinte
+    $padding = [Math]::Max(
+        1,
+        $consoleWidth - $leftText.Length - $DateTime.Length - 1
+    )
 
-  if ($isREBASING) {
-    $state = "REBASING"
-  } elseif ($isMERGING) {
-    $state = "MERGING"
-  } elseif ($isCHERRY) {
-    $state = "CHERRY-PICKING"
-  } elseif ($isREVERTING) {
-    $state = "REVERTING"
-  }
+    $spaces = " " * $padding
 
-  return $state
+    #----------------------------------------------------------------------
+    # Linha superior
+    #----------------------------------------------------------------------
+
+    Write-HostColor -Text "`n$UserName@$ComputerName " -HexColor "#13A10E" -NoNewline
+    Write-HostColor -Text "$CurrentPath "              -HexColor "#C19C00" -NoNewline
+
+    if ($isGitRepo) {
+
+        Write-HostColor -Text "(" -HexColor "#FFFFFF" -NoNewline
+
+        if ($gitState) {
+
+            Write-HostColor -Text $gitBranch -HexColor "#3A96DD" -NoNewline
+            Write-HostColor -Text "|"         -HexColor "#FFFFFF" -NoNewline
+            Write-HostColor -Text $gitState  -HexColor "#D10B0E" -NoNewline
+
+        }
+        elseif ($gitRemote -and $gitBranch) {
+
+            Write-HostColor -Text $gitRemote -HexColor "#D10B0E" -NoNewline
+            Write-HostColor -Text "/"        -HexColor "#FFFFFF" -NoNewline
+            Write-HostColor -Text $gitBranch -HexColor "#3A96DD" -NoNewline
+
+        }
+
+        Write-HostColor -Text ")" -HexColor "#FFFFFF" -NoNewline
+    }
+
+    Write-HostColor -Text "$spaces$DateTime" -HexColor "#FFFFFF"
+
+    #----------------------------------------------------------------------
+    # Linha inferior
+    #----------------------------------------------------------------------
+
+    return "> "
 }
